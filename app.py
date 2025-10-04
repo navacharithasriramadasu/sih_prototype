@@ -41,38 +41,69 @@ for key in ["logged_in", "user", "role", "cache"]:
 # -----------------------
 # GOOGLE SHEETS AUTHENTICATION
 # -----------------------
-def load_service_account_info():
-    info = None
-    if "SERVICE_ACCOUNT_JSON" in st.secrets:
-        raw = st.secrets["SERVICE_ACCOUNT_JSON"]
-        info = json.loads(raw) if isinstance(raw, str) else dict(raw)
-        if "private_key" in info and "\\n" in info["private_key"]:
-            info["private_key"] = info["private_key"].replace("\\n", "\n")
-    elif os.path.exists(SERVICE_ACCOUNT_FILE):
-        with open(SERVICE_ACCOUNT_FILE, "r") as f:
-            info = json.load(f)
-    return info
+import json, os
+import streamlit as st
+import gspread
+from google.oauth2.service_account import Credentials
 
-def authenticate_gsheets(sheet_id):
-    creds_info = load_service_account_info()
-    if creds_info is None:
-        st.error("❌ No Google service account credentials found.")
-        st.stop()
-    scopes = ["https://www.googleapis.com/auth/spreadsheets",
-              "https://www.googleapis.com/auth/drive"]
+def authenticate_gsheets(sheet_id: str):
+    """Authenticate to Google Sheets using either:
+       1. SERVICE_ACCOUNT_JSON environment variable (Render, Streamlit Cloud)
+       2. service_account.json file (local)"""
+
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+
+    creds = None
+
     try:
-        creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
+        # --- Option A: Environment variable (Render safe)
+        if os.getenv("SERVICE_ACCOUNT_JSON"):
+            raw = os.getenv("SERVICE_ACCOUNT_JSON")
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                st.error("❌ SERVICE_ACCOUNT_JSON is not valid JSON.")
+                st.stop()
+
+            # Fix escaped newlines
+            if "private_key" in data and "\\n" in data["private_key"]:
+                data["private_key"] = data["private_key"].replace("\\n", "\n")
+
+            creds = Credentials.from_service_account_info(data, scopes=scopes)
+
+        # --- Option B: Local file (for local testing)
+        elif os.path.exists("service_account.json"):
+            creds = Credentials.from_service_account_file("service_account.json", scopes=scopes)
+        else:
+            st.error("❌ No credentials found. Provide SERVICE_ACCOUNT_JSON (env var) or service_account.json file.")
+            st.stop()
+
+        # Authorize client
         client = gspread.authorize(creds)
         spreadsheet = client.open_by_key(sheet_id)
         st.success("✅ Google Sheets authentication successful!")
         return spreadsheet
+
     except gspread.SpreadsheetNotFound:
-        st.error("❌ Spreadsheet not found. Check SHEET_ID and share sheet with service account.")
+        st.error(
+            "❌ Spreadsheet not found. Ensure SHEET_ID is correct and "
+            "the service account email has **Editor** access."
+        )
         st.stop()
     except Exception as e:
-        st.error(f"❌ Failed to authenticate to Google Sheets.\nError: {e}")
+        st.error(
+            f"❌ Failed to authenticate to Google Sheets.\n\n"
+            "Possible causes:\n"
+            "1️⃣ SERVICE_ACCOUNT_JSON not formatted correctly\n"
+            "2️⃣ Missing line breaks in private_key (Render issue)\n"
+            "3️⃣ Sheet not shared with service account\n"
+            "4️⃣ Invalid SHEET_ID\n\n"
+            f"Error: {e}"
+        )
         st.stop()
-
 # -----------------------
 # OPEN SHEET
 # -----------------------
@@ -440,3 +471,4 @@ if st.session_state.logged_in:
             st.dataframe(assigned_rooms[["name","department","hostel_room"]])
         else:
             st.info("No hostel rooms assigned yet.")
+
