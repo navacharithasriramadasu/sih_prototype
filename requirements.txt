@@ -4,7 +4,7 @@ pandas==2.2.3
 numpy==1.26.4
 openpyxl==3.1.5
 protobuf==4.25.3
-requests=
+requests
 gspread==6.0.2
 oauth2client==4.1.3
 google-auth==2.33.0
@@ -13,6 +13,7 @@ google-auth-httplib2==0.2.0
 plotly==5.13.1
 streamlit-autorefresh==1.0.1
 cachetools==5.3.3
+
 
 
 
