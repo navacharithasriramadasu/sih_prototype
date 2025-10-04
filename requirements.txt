@@ -1,3 +1,4 @@
+--only-binary=:all:
 streamlit==1.50.0
 pandas==2.2.3
 numpy==1.26.4
@@ -10,5 +11,6 @@ plotly==5.13.1
 streamlit-autorefresh==1.0.1
 requests==2.32.3
 cachetools==5.3.3
+
 
 
